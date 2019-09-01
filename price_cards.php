@@ -17,15 +17,15 @@ $requestText = file_get_contents("php://input");
 $requestObject = json_decode($requestText);
 file_put_contents("requestoject.txt", json_encode($requestObject));
 $cardName = $requestObject->message->text;
+file_put_contents("cardname.txt", $cardName);
 // STEP 2: Проверить есть ли уже данные о карте в базе данных
 $validationEx = "SELECT * FROM cards WHERE Name = '{$cardName}'";
 $dbResponse = Database::query($validationEx);
 $Date = "";
 // STEP 3: Если есть, то проверить их возраст
-if($dbResponse->num_rows = 1) {
+if($dbResponse->num_rows == 1) {
 	$responseRow = $dbResponse->fetch_assoc();
 	$Date = intval($responseRow["Date"]);
-
 }
 file_put_contents("Date.txt", json_encode($Date));
 // STEP 4: Если они старше 12 часов, то запросить новые данные
