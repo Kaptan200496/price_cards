@@ -15,21 +15,34 @@ Database::connect();
 // STEP 1: Получить данные в json и перевести их в объект
 $requestText = file_get_contents("php://input");
 $requestObject = json_decode($requestText);
-file_put_contents("requestoject.txt", json_encode($requestObject));
+	//file_put_contents("requestoject.txt", json_encode($requestObject));
 $cardName = $requestObject->message->text;
-file_put_contents("cardname.txt", $cardName);
+	//file_put_contents("cardname.txt", $cardName);
 // STEP 2: Проверить есть ли уже данные о карте в базе данных
 $validationEx = "SELECT * FROM cards WHERE Name = '{$cardName}'";
 $dbResponse = Database::query($validationEx);
-$Date = "";
+$date = "";
 // STEP 3: Если есть, то проверить их возраст
 if($dbResponse->num_rows == 1) {
 	$responseRow = $dbResponse->fetch_assoc();
-	$Date = intval($responseRow["Date"]);
+	$date = intval($responseRow["Date"]);
 }
-file_put_contents("Date.txt", json_encode($Date));
+	//file_put_contents("Date.txt", json_encode($Date));
 // STEP 4: Если они старше 12 часов, то запросить новые данные
-// STEP 5: При проучении записать их в базу данных или обновить если уже были.
+$timeNow = time();
+$twelveHours = 60*60*12;
+$sf = new Scryfall();
+if(($timeNow - $date) > $twelveHours) {
+	// запрашиваем новые данные
+	$rawArguments = [
+		"exact" => $cardName
+	];
+	$method = "named";
+	$sfResponse = $sf->request($method, $rawArguments);
+}
+
+
+// STEP 5: При получении записать их в базу данных или обновить если уже были.
 // STEP 6: Проверить данные о курсе в базе данных
 // STEP 7: Если данные есть, то проверить их возраст
 // STEP 8: Если возраст больше 12 часов, то запросить новые
