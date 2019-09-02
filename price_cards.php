@@ -22,13 +22,26 @@ $cardName = $requestObject->message->text;
 $validationEx = "SELECT * FROM cards WHERE Name = '{$cardName}'";
 $dbResponse = Database::query($validationEx);
 $date = "";
-$address = $sfResponse->image_uris->large;
-$price = $sfResponse->price->usd;
 $sf = new Scryfall();
 $pb = new PrivatBank();
 $bot = new TelegramBot("686794783:AAFvJ6_yvAt2Zt0jilrZss26atxYyuEkWao");
-$updateEx = "UPDATE cards SET Name = '{$cardName}', Address = '{$address}', Price = '{$price}' WHERE Name = '{$cardName}'";
-$insertEx = "INSERT INTO cards (Name, Address, Price) VALUES ('{$cardName}', '{$address}', '{$price}')";
+$updateEx = "UPDATE cards 
+		SET 
+		Name = '{$cardName}', 
+		Address = '{$address}', 
+		Price = '{$price}'
+		WHERE 
+		Name = '{$cardName}'
+";
+$insertEx = "INSERT INTO cards (
+		Name, 
+		Address, 
+		Price
+	) VALUES (
+	'{$cardName}', 
+	'{$address}', 
+	'{$price}'
+)";
 // STEP 3: Если есть, то проверить их возраст
 if($dbResponse->num_rows == 1) {
 	$responseRow = $dbResponse->fetch_assoc();
@@ -40,7 +53,7 @@ else {
 		"exact" => $cardName
 	];
 	$method = "named";
-	$sfResponse = $sf->request($method, $rawArguments);
+	$cardsData = $sf->request($method, $rawArguments);
 	Datavase::query($insertEx);
 }
 // STEP 4: Если они старше 12 часов, то запросить новые данные
@@ -52,19 +65,35 @@ if(($timeNow - $date) > $twelveHours) {
 		"exact" => $cardName
 	];
 	$method = "named";
-	$sfResponse = $sf->request($method, $rawArguments);
+	$cardsData = $sf->request($method, $rawArguments);
 // STEP 5: При получении записать их в базу данных или обновить если уже были.
 	Database::query($updateEx);
+}
+else {
+	$cardsQuery = Database::query($validateEx);
+	$cardsData = $cardsQuery->fetch_assoc();
+	$cardsData["Date"] = intval($cardsData["Date"]);
 
 }
-	//file_put_contents("sfresponse.txt", json_encode($sfResponse));
+	//file_put_contents("sfresponse.txt", json_encode($cardsData));
+$address = $cardsData->image_uris->large;
+$price = $cardsData->price->usd;
 
 // STEP 6: Проверить данные о курсе в базе данных
 $selectEx = "SELECT RateExchangeUAH FROM price";
 $response = Database::query($selectEx);
 $rateExchangeUAH = $pbResponse[0]->sale;
-$insertExchange = "INSERT INTO price (Name_currency, RateExchangeUAH) VALUES('USD', '{$rateExchangeUAH}')";
-$updateExchange = "UPDATE price SET RateExchangeUAH = '{$rateExchangeUAH}' WHERE Name_currency = 'USD'";
+$insertExchange = "INSERT INTO price (
+		Name_currency, 
+		RateExchangeUAH
+	) VALUES (
+		'USD', 
+		'{$rateExchangeUAH}'
+)";
+$updateExchange = "UPDATE price 
+	SET RateExchangeUAH = '{$rateExchangeUAH}'
+	WHERE Name_currency = 'USD'
+";
 if($response->num_rows == 1) {
 	$row = $response->fetch_assoc();
 	$dateRow = intval($row["Date"]);
