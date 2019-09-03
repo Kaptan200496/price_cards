@@ -12,129 +12,120 @@ foreach ($includes as $fileToInclude) {
 }
 require_once("settings.php");
 Database::connect();
+$sf = new Scryfall();
+$pb = new PrivatBank();
+$bot = new TelegramBot("bottoken");
+
 // STEP 1: Получить данные в json и перевести их в объект
 $requestText = file_get_contents("php://input");
 $requestObject = json_decode($requestText);
-	//file_put_contents("requestoject.txt", json_encode($requestObject));
 $cardName = $requestObject->message->text;
-	//file_put_contents("cardname.txt", $cardName);
+
 // STEP 2: Проверить есть ли уже данные о карте в базе данных
 $validationEx = "SELECT * FROM cards WHERE Name = '{$cardName}'";
 $dbResponse = Database::query($validationEx);
-$date = "";
-$sf = new Scryfall();
-$pb = new PrivatBank();
-$bot = new TelegramBot("686794783:AAFvJ6_yvAt2Zt0jilrZss26atxYyuEkWao");
-$updateEx = "UPDATE cards 
-		SET 
-		Name = '{$cardName}', 
-		Address = '{$address}', 
-		Price = '{$price}'
-		WHERE 
-		Name = '{$cardName}'
-";
-$insertEx = "INSERT INTO cards (
+$cardInDatabase = ($dbResponse->num_rows > 0);
+
+// STEP 3: Если есть, то проверить их возраст
+$olderThan12Hours = false;
+$card = new stdClass();
+if($cardInDatabase) {
+	$dbRow = $dbResponse->fetch_assoc();
+	$card->date = intval($dbRow["Date"]);
+	$card->name = $dbRow["Name"];
+	$card->price = floatval($dbRow["Price"]);
+	$card->address = $dbRow["Address"];
+	$olderThan12Hours = ($card->date < (time() - 3600 * 12));
+}
+
+// STEP 4: Если они старше 12 часов, то запросить новые данные
+if((!$cardInDatabase) || $olderThan12Hours) {
+	$cardData = $sf->request("named", ["exact" => $cardName]);
+	file_put_contents("cardData.txt", json_encode($cardData));
+	$card->name = $cardData->name;
+	$card->price = $cardData->prices->usd;
+	$card->address = $cardData->image_uris->large;
+}
+if(!$cardInDatabase) {
+	$insertEx = "INSERT INTO cards (
 		Name, 
 		Address, 
 		Price
 	) VALUES (
-	'{$cardName}', 
-	'{$address}', 
-	'{$price}'
-)";
-// STEP 3: Если есть, то проверить их возраст
-if($dbResponse->num_rows == 1) {
-	$responseRow = $dbResponse->fetch_assoc();
-	$date = intval($responseRow["Date"]);
+		'{$card->name}', 
+		'{$card->address}', 
+		'{$card->price}'
+	)";
+	Database::query($insertEx);
 }
-	//file_put_contents("Date.txt", json_encode($Date));
-else {
-	$rawArguments = [
-		"exact" => $cardName
-	];
-	$method = "named";
-	$cardsData = $sf->request($method, $rawArguments);
-	Datavase::query($insertEx);
-}
-// STEP 4: Если они старше 12 часов, то запросить новые данные
-$timeNow = time();
-$twelveHours = 60;
-if(($timeNow - $date) > $twelveHours) {
-	// запрашиваем новые данные
-	$rawArguments = [
-		"exact" => $cardName
-	];
-	$method = "named";
-	$cardsData = $sf->request($method, $rawArguments);
-// STEP 5: При получении записать их в базу данных или обновить если уже были.
+else if($olderThan12Hours) {
+	$updateEx = "UPDATE cards 
+	SET  
+		Address = '{$card->address}', 
+		Price = '{$card->price}'
+	WHERE 
+		Name = '{$card->name}'
+	";
 	Database::query($updateEx);
 }
-else {
-	$cardsQuery = Database::query($validateEx);
-	$cardsData = $cardsQuery->fetch_assoc();
-	$cardsData["Date"] = intval($cardsData["Date"]);
-
-}
-	//file_put_contents("sfresponse.txt", json_encode($cardsData));
-$address = $cardsData->image_uris->large;
-$price = $cardsData->price->usd;
 
 // STEP 6: Проверить данные о курсе в базе данных
-$selectEx = "SELECT RateExchangeUAH FROM price";
+$selectEx = "SELECT * FROM price";
 $response = Database::query($selectEx);
-$rateExchangeUAH = $pbResponse[0]->sale;
-$insertExchange = "INSERT INTO price (
+$rateInDB = ($response->num_rows > 0);
+
+$rate = new stdClass();
+if($rateInDB) {
+	$rateRow = $response->fetch_assoc();
+	$rate->name = $rateRow["Name_currency"];
+	$rate->rate = $rateRow["RateExchangeUAH"];
+	$rate->date = $rateRow["Date"];
+	$olderThan12Hours = ($rate->date < (time() - 3600 * 12));
+}
+if(!$rateInDB || $olderThan12Hours) {
+	$rawArguments = [
+		"json" => 1,
+		"exchange" => 1,
+		"coursid" => 11 
+	];
+	$rateData = $pb->request("pubinfo", $rawArguments);
+	$rate->name = $rateData[0]->ccy;
+	$rate->rate = $rateData[0]->sale;
+}
+if(!$rateInDB) {
+	$insertExchange = "INSERT INTO price (
 		Name_currency, 
 		RateExchangeUAH
 	) VALUES (
-		'USD', 
-		'{$rateExchangeUAH}'
-)";
-$updateExchange = "UPDATE price 
-	SET RateExchangeUAH = '{$rateExchangeUAH}'
-	WHERE Name_currency = 'USD'
-";
-if($response->num_rows == 1) {
-	$row = $response->fetch_assoc();
-	$dateRow = intval($row["Date"]);
-}
-else {
-	$rawArguments = [
-		"json" => 1,
-		"exchange" => 1,
-		"coursid" => 11 
-	];
-	$method = "pubinfo";
-	$pbResponse = $pb->request($method, $rawArguments);
+		'{$rate->name}', 
+		'{$rate->rate}'
+	)";
 	Database::query($insertExchange);
 }
-// STEP 7: Если данные есть, то проверить их возраст
-if(($timeNow - $dateRow) > $twelveHours) {
-// STEP 8: Если возраст больше 12 часов, то запросить новые
-	$rawArguments = [
-		"json" => 1,
-		"exchange" => 1,
-		"coursid" => 11 
-	];
-	$method = "pubinfo";
-	$pbResponse = $pb->request($method, $rawArguments);
-// STEP 9: При получении записать данные о курсе в базу данных или обновить есдли уже были
+else if($olderThan12Hours) {
+	$updateExchange = "UPDATE price 
+		SET 
+			RateExchangeUAH = '{$rate->rate}'
+		WHERE
+			Name_currency = 'USD'
+	";
 	Database::query($updateExchange);
 }
 // STEP 10: Вычислить цену в гривнах
-$priceInUAH = $rateExchangeUAH * $price;
+$priceInUAH = $rate->rate * $card->price;
 // STEP 11: Вывести фото
 $methodPhoto = "sendPhoto";
 $rawArgumentsPhoto = [
-	"chat_id" => $requestObject->chat_id,
-	"photo" => $address
+	"chat_id" => $requestObject->message->chat->id,
+	"photo" => $card->address
 ];
 $responsePhoto = $bot->request($methodPhoto, $rawArgumentsPhoto);
 // STEP 12: Вывести название карты и цену в гривнах. Рядом в скобках цену в долларах.
 $methodText = "sendMessage";
 $rawArgumentsText = [
-	"chat_id" => $requestObject->chat_id,
+	"chat_id" => $requestObject->message->chat->id,
 	"text" => $priceInUAH
 ];
 $responseText = $bot->request($methodText, $rawArgumentsText);
 ?>
+
