@@ -112,7 +112,8 @@ else if($olderThan12Hours) {
 	Database::query($updateExchange);
 }
 // STEP 10: Вычислить цену в гривнах
-$priceInUAH = $rate->rate * $card->price;
+$priceInUAH = round(($rate->rate * $card->price), 2) . " " . "грн";
+$cardPrice = round(($card->price), 2);
 // STEP 11: Вывести фото
 $methodPhoto = "sendPhoto";
 $rawArgumentsPhoto = [
@@ -121,7 +122,7 @@ $rawArgumentsPhoto = [
 ];
 $responsePhoto = $bot->request($methodPhoto, $rawArgumentsPhoto);
 // STEP 12: Вывести название карты и цену в гривнах. Рядом в скобках цену в долларах.
-$priceRow = $cardName . " " . "-" . " " . $priceInUAH . " " . "(" . $card->price . "$)";
+$priceRow = $cardName . " " . "-" . " " . $priceInUAH . " " . "(" . $cardPrice . "$)";
 $methodText = "sendMessage";
 $rawArgumentsText = [
 	"chat_id" => $requestObject->message->chat->id,
