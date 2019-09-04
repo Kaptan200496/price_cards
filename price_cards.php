@@ -121,10 +121,11 @@ $rawArgumentsPhoto = [
 ];
 $responsePhoto = $bot->request($methodPhoto, $rawArgumentsPhoto);
 // STEP 12: Вывести название карты и цену в гривнах. Рядом в скобках цену в долларах.
+$priceRow = $cardName . " " . "-" . " " . $priceInUAH . " " . "(" . $card->price . "$)";
 $methodText = "sendMessage";
 $rawArgumentsText = [
 	"chat_id" => $requestObject->message->chat->id,
-	"text" => $priceInUAH
+	"text" => $priceRow
 ];
 $responseText = $bot->request($methodText, $rawArgumentsText);
 ?>
