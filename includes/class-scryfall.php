@@ -22,5 +22,6 @@ class Scryfall {
 		$requestResult = json_decode(file_get_contents($apiAddress));
 		return $requestResult;
 	}
+	
 }
 ?>
