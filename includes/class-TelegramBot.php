@@ -20,7 +20,7 @@ class TelegramBot {
 		
 	}
 
-	public function request($method, $fileToSend) {
+	public function request($method, $rawArguments = []) {
 		$serviceUrl = self::$serviceUrl;
 		$botToken = $this->token;
 		$curl = "{$serviceUrl}{$botToken}/{$method}";
@@ -34,11 +34,11 @@ class TelegramBot {
 		// Указываем, что нам нужно сохранить вывод сервера
 		curl_setopt($curlRequest, CURLOPT_RETURNTRANSFER, true);
 		// Указываем, что мы его отправляем
-		curl_setopt($curlRequest, CURLOPT_POSTFIELDS, $fileToSend);
+		curl_setopt($curlRequest, CURLOPT_POSTFIELDS, json_encode($rawArguments));
 		// Отправляем запрос, получаем ответ
 		$serverOutput = curl_exec($curlRequest);
 		// Закрываем запрос
 		curl_close($curlRequest);
-		return json_encode($serverOutput);
+
 	}
 }

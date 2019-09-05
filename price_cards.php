@@ -116,18 +116,18 @@ $priceInUAH = round(($rate->rate * $card->price), 2) . " " . "грн";
 $cardPrice = round(($card->price), 2);
 // STEP 11: Вывести фото
 $methodPhoto = "sendPhoto";
-$rawArgumentsPhoto = [
+$rawArgumentsForPhoto = [
 	"chat_id" => $requestObject->message->chat->id,
 	"photo" => $card->address
 ];
-$responsePhoto = $bot->request($methodPhoto, $card->address);
+$responsePhoto = $bot->request($methodPhoto, $rawArgumentsForPhoto);
 // STEP 12: Вывести название карты и цену в гривнах. Рядом в скобках цену в долларах.
 $priceRow = $cardName . " " . "-" . " " . $priceInUAH . " " . "(" . $cardPrice . "$)";
 $methodText = "sendMessage";
-$rawArgumentsText = [
+$rawArgumentsForText = [
 	"chat_id" => $requestObject->message->chat->id,
 	"text" => $priceRow
 ];
-$responseText = $bot->request($methodText, $priceRow);
+$responseText = $bot->request($methodText, $rawArgumentsForText);
 ?>
 
